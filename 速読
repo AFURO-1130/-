@@ -1,0 +1,148 @@
+"use strict";
+// モジュール呼び出し
+const crypto = require("crypto");
+const line = require("@line/bot-sdk");
+
+
+// インスタンス生成
+const client = new line.Client({ channelAccessToken: process.env.ACCESSTOKEN });
+
+exports.handler = (event, context, callback) => {
+  // 署名検証
+  const signature = crypto
+    .createHmac("sha256", process.env.CHANNELSECRET)
+    .update(event.body)
+    .digest("base64");
+  const checkHeader = (event.headers || {})["X-Line-Signature"];
+  const body = JSON.parse(event.body);
+  const events = body.events;
+  console.log(events);
+
+  // 署名検証が成功した場合
+  if (signature === checkHeader) {
+    events.forEach(async (event) => {
+      let message;
+      // イベントタイプごとに関数を分ける
+      switch (event.type) {
+        // メッセージイベント
+        case "message":
+          message = await messageFunc(event);
+          break;
+        // フォローイベント
+        case "follow":
+          message = { type: "text", text: "追加ありがとうございます！" };
+          break;
+        // ポストバックイベント
+        case "postback":
+          message = await postbackFunc(event);
+          break;
+          
+          
+          
+      }
+      // メッセージを返信
+      if (message != undefined) {
+        client
+          .replyMessage(body.events[0].replyToken, message)
+          .then((response) => {
+            const lambdaResponse = {
+              statusCode: 200,
+              headers: { "X-Line-Status": "OK" },
+              body: '{"result":"completed"}',
+            };
+            context.succeed(lambdaResponse);
+          })
+          .catch((err) => console.log(err));
+      }
+    });
+  }
+  // 署名検証に失敗した場合
+  else {
+    console.log("署名認証エラー");
+  }
+};
+
+const messageFunc = async function (event) {
+  let message;
+  message = {
+  "type": "flex",
+  "altText": "flexMessageです",
+  "contents": {
+  "type": "bubble",
+  "direction": "ltr",
+  "header": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "text",
+        "text": "次から選んでね！！",
+        "align": "center",
+        "contents": []
+      }
+    ]
+  },
+  "body": {
+    "type": "box",
+    "layout": "vertical",
+    "backgroundColor": "#FFFFFFFF",
+    "contents": [
+      {
+        "type": "text",
+        "text": "postponeの意味は？？",
+        "align": "center",
+        "contents": []
+      }
+    ]
+  },
+  "footer": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "button",
+        "action": {
+          "type": "postback",
+          "label": "~を延期する",
+          "data": "1"
+        }
+      },
+      {
+        "type": "button",
+        "action": {
+          "type": "postback",
+          "label": "〜を伸ばす",
+          "data": "0"
+        }
+      },
+      {
+        "type": "button",
+        "action": {
+          "type": "postback",
+          "label": "〜を遠ざける",
+          "data": "0"
+        },
+        "gravity": "center"
+      },
+      {
+        "type": "button",
+        "action": {
+          "type": "postback",
+          "label": "〜を外す",
+          "data": "0"
+        }
+      }
+    ]
+  }
+}
+
+};
+  return message;
+};
+
+const postbackFunc = async function (event) {
+  let message;
+  message = { type:"text",text:"正解！" };
+  message = { type:"text",text:"不正解！"};
+  return message;
+};
